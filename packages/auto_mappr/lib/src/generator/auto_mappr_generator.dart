@@ -1,6 +1,6 @@
 //ignore_for_file: avoid-dynamic
 import 'package:analyzer/dart/constant/value.dart';
-import 'package:analyzer/dart/element/element2.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:auto_mappr/src/builder/auto_mappr_builder.dart';
 import 'package:auto_mappr/src/extensions/dart_object_extension.dart';
@@ -50,14 +50,14 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
 
   @override
   // ignore: deprecated_member_use, source_gen requires this
-  dynamic generateForAnnotatedElement(Element2 element, ConstantReader annotation, BuildStep buildStep) {
+  dynamic generateForAnnotatedElement(Element element, ConstantReader annotation, BuildStep buildStep) {
     // ignore: deprecated_member_use, source_gen requires this
-    final filePath = element.library2?.identifier;
+    final filePath = element.library?.identifier;
     final fileUri = filePath != null ? Uri.parse(filePath) : null;
 
     return runZonedAutoMappr(libraryUri: fileUri, () {
       // ignore: deprecated_member_use, source_gen requires this
-      if (element is! ClassElement2) {
+      if (element is! ClassElement) {
         throw InvalidGenerationSourceError(
           '${element.displayName} is not a class and cannot be annotated with @AutoMappr.',
           element: element,
@@ -91,7 +91,7 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
       final config = AutoMapprConfig(
         mappers: mappers,
         // ignore: deprecated_member_use, source_gen requires this
-        availableMappingsMacroId: element.library2.identifier,
+        availableMappingsMacroId: element.library.identifier,
         modulesCode: delegatesExpression,
         delegatesList: delegatesList,
         mapprOptions: mapprOptions,
@@ -109,7 +109,7 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
     required List<DartObject> mappers,
     required List<TypeConverter> globalConverters,
     // ignore: deprecated_member_use, source_gen requires this
-    required ClassElement2 element,
+    required ClassElement element,
   }) {
     final res = mappers.map((mapper) {
       final mapperType = mapper.type! as ParameterizedType;
@@ -242,7 +242,7 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
         source: sourceType,
         target: targetType,
         // ignore: avoid-non-null-assertion, ok for now
-        converter: converter.getField(typeConverterFieldConverter)!.toFunctionValue2()!,
+        converter: converter.getField(typeConverterFieldConverter)!.toFunctionValue()!,
       );
     }).toList();
   }
@@ -252,14 +252,14 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
     final mappings = <DartObject>[];
 
     for (final include in includesList) {
-      final x = include.type?.element3;
-      if (x is! InstanceElement2) {
+      final x = include.type?.element;
+      if (x is! InstanceElement) {
         continue;
       }
 
       // For each include locate AutoMappr annotation.
-      if (x.metadata2.annotations
-              .firstWhereOrNull((data) => data.element2?.displayName == annotationAutoMappr)
+      if (x.metadata.annotations
+              .firstWhereOrNull((data) => data.element?.displayName == annotationAutoMappr)
               ?.computeConstantValue()
           case final includeConstant?) {
         // This -- converters.
