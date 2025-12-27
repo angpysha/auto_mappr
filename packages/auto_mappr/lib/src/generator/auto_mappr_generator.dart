@@ -117,6 +117,39 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
       final sourceType = mapperType.typeArguments.firstOrNull;
       final targetType = mapperType.typeArguments.lastOrNull;
 
+      if (sourceType == null) {
+        throw InvalidGenerationSourceError(
+          'Source type is null and cannot be mapped from',
+          element: element,
+          todo: 'Provide a valid source type',
+        );
+      }
+      
+      if (targetType == null) {
+        throw InvalidGenerationSourceError(
+          'Target type is null and cannot be mapped to',
+          element: element,
+          todo: 'Provide a valid target type',
+        );
+      }
+
+      // Check for InvalidType - this can happen with malformed generic types
+      if (sourceType is InvalidType) {
+        throw InvalidGenerationSourceError(
+          'Source type is invalid and cannot be mapped from. This may be due to a malformed generic type parameter.',
+          element: element,
+          todo: 'Check your generic type parameters and ensure they are properly defined',
+        );
+      }
+      
+      if (targetType is InvalidType) {
+        throw InvalidGenerationSourceError(
+          'Target type is invalid and cannot be mapped to. This may be due to a malformed generic type parameter.',
+          element: element,
+          todo: 'Check your generic type parameters and ensure they are properly defined',
+        );
+      }
+
       if (sourceType is! InterfaceType) {
         final emittedSource = EmitterHelper.current.typeReferEmitted(type: sourceType);
 

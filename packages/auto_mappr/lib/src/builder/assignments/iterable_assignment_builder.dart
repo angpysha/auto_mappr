@@ -1,3 +1,4 @@
+import 'package:analyzer/dart/element/type.dart';
 import 'package:auto_mappr/src/builder/assignments/assignment_builder_base.dart';
 import 'package:auto_mappr/src/builder/assignments/nested_object_mixin.dart';
 import 'package:auto_mappr/src/extensions/dart_type_extension.dart';
@@ -46,13 +47,17 @@ class IterableAssignmentBuilder extends AssignmentBuilderBase with NestedObjectM
     final defaultIterableValueExpression = targetType.defaultIterableExpression();
 
     if (assignNestedObject) {
+      // If targetIterableType contains TypeParameterType (generic parameters),
+      // use sourceIterableType for the type argument instead, as it contains the actual types
+      final typeArgumentForMap = _resolveTypeArgumentForMap(targetIterableType, sourceIterableType, targetType);
+      
       return sourceIterableExpression
           // Map complex nested types.
           .maybeNullSafeProperty('map', isOnNullable: isSourceNullable)
           .call(
             [_map(assignment)],
             {},
-            [EmitterHelper.current.typeRefer(type: targetIterableType)],
+            typeArgumentForMap != null ? [EmitterHelper.current.typeRefer(type: typeArgumentForMap)] : [],
           )
           // Call toList, toSet or nothing.
           // isOnNullable is false, because if map() was called, the value is non-null
@@ -77,6 +82,35 @@ class IterableAssignmentBuilder extends AssignmentBuilderBase with NestedObjectM
           defaultIterableValueExpression,
           isOnNullable: !isTargetNullable && isSourceNullable,
         );
+  }
+
+  /// Resolves the type argument for map() call.
+  /// If targetIterableType contains TypeParameterType (generic parameters),
+  /// tries to resolve them from the context (targetType) or uses sourceIterableType.
+  DartType? _resolveTypeArgumentForMap(DartType targetIterableType, DartType sourceIterableType, DartType targetType) {
+    // Check if targetIterableType contains any TypeParameterType
+    bool containsTypeParameter(DartType type) {
+      if (type is TypeParameterType) return true;
+      if (type is ParameterizedType) {
+        return type.typeArguments.any((arg) => containsTypeParameter(arg));
+      }
+      return false;
+    }
+
+    // If targetIterableType doesn't contain generic parameters, use it directly
+    if (!containsTypeParameter(targetIterableType)) {
+      return targetIterableType;
+    }
+
+    // If targetIterableType contains generic parameters, try to use sourceIterableType
+    // which should have the actual concrete types
+    if (!containsTypeParameter(sourceIterableType)) {
+      return sourceIterableType;
+    }
+
+    // If both contain generic parameters, we can't resolve them - return null
+    // This will cause map() to be called without type argument, which should work
+    return null;
   }
 
   Expression _map(SourceAssignment assignment) {

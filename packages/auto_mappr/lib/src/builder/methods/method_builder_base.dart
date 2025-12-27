@@ -33,14 +33,28 @@ abstract class MethodBuilderBase {
   static String constructConvertMethodName({
     required DartType source,
     required DartType target,
-  }) =>
-      '_map_${source.toConvertMethodName()}_To_${target.toConvertMethodName()}';
+  }) {
+    // For method names, we don't include top-level nullability markers (Q)
+    // because nullable methods have a separate _Nullable suffix
+    // However, we still preserve nullability for generic type arguments
+    final sourceName = source.toConvertMethodName(includeTopLevelNullability: false);
+    final targetName = target.toConvertMethodName(includeTopLevelNullability: false);
+    
+    return '_map_${sourceName}_To_${targetName}';
+  }
 
   static String constructNullableConvertMethodName({
     required DartType source,
     required DartType target,
-  }) =>
-      '${constructConvertMethodName(source: source, target: target)}_Nullable';
+  }) {
+    // For nullable methods, use non-nullable versions of types for the method name
+    // to ensure consistency (the _Nullable suffix already indicates the method handles nullable types)
+    // We use toConvertMethodName with includeTopLevelNullability: false to avoid adding 'Q' for top-level nullability
+    final sourceName = source.toConvertMethodName(includeTopLevelNullability: false);
+    final targetName = target.toConvertMethodName(includeTopLevelNullability: false);
+    
+    return '_map_${sourceName}_To_${targetName}_Nullable';
+  }
 
   Method buildMethod();
 

@@ -83,17 +83,61 @@ extension DartTypeExtension on DartType {
         : literalList([], EmitterHelper.current.typeRefer(type: itemType));
   }
 
-  String toConvertMethodName() {
-    final emittedThis = EmitterHelper.current
-        .typeReferEmitted(type: this)
-        .replaceAll(' ', '')
-        .replaceAll('?', '')
-        .replaceAll('.', r'$')
-        .replaceAll(',', r'_$')
-        .replaceAll('<', r'$')
-        .replaceAll('>', r'$');
-    final buffer = StringBuffer()..write(emittedThis);
-
+  String toConvertMethodName({bool includeTopLevelNullability = true}) {
+    // Generate method name that preserves nullability information within generic types
+    // to avoid collisions like Container<int?> vs Container<int>
+    final buffer = StringBuffer();
+    _appendTypeNameForMethod(this, buffer, includeTopLevelNullability: includeTopLevelNullability);
     return buffer.toString();
+  }
+
+  static void _appendTypeNameForMethod(
+    DartType type,
+    StringBuffer buffer, {
+    bool includeTopLevelNullability = true,
+  }) {
+    // Handle nullability suffix at the top level - we'll encode it differently
+    final isTopLevelNullable = type.isNullable;
+    
+    // Get the base type name
+    final elementName = type.element?.name;
+    if (elementName != null) {
+      buffer.write(elementName);
+    } else {
+      // Fallback for types without element (like generic parameters)
+      final displayString = type.getDisplayString(withNullability: false);
+      final baseName = displayString.split('<').first.split('?').first.trim();
+      buffer.write(baseName.isNotEmpty ? baseName : 'dynamic');
+    }
+    
+    // Handle generic type arguments
+    if (type is ParameterizedType && type.typeArguments.isNotEmpty) {
+      buffer.write(r'$');
+      for (int i = 0; i < type.typeArguments.length; i++) {
+        if (i > 0) buffer.write('_');
+        final arg = type.typeArguments[i];
+        // Recursively append type argument name (always include nullability for type arguments)
+        _appendTypeNameForMethod(arg, buffer, includeTopLevelNullability: true);
+        // Add nullability marker for nullable type arguments
+        if (arg.isNullable) {
+          buffer.write('Q'); // Q for Question mark (nullable)
+        }
+      }
+      buffer.write(r'$');
+    }
+    
+    // Add nullability marker for top-level nullable types (only if includeTopLevelNullability is true)
+    if (includeTopLevelNullability && isTopLevelNullable) {
+      buffer.write('Q');
+    }
+    
+    // Replace special characters that might cause issues
+    final result = buffer.toString()
+        .replaceAll(' ', '')
+        .replaceAll('.', r'$')
+        .replaceAll(',', r'_$');
+    
+    buffer.clear();
+    buffer.write(result);
   }
 }

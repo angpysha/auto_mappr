@@ -63,13 +63,21 @@ class EmitterHelper {
 
     // Get symbol name - handle generic type parameters and other cases where element?.name might be null
     String? symbolName = type.element?.name;
+
+    // Special handling for TypeParameterType (generic type parameters like T, A, B)
+    // For TypeParameterType, element should be TypeParameterElement and element.name should work
+    // But if it's null, use getDisplayString as fallback
     if (symbolName == null || symbolName.isEmpty) {
       // Fallback to getDisplayString for generic parameters and other edge cases
-      // Remove nullability suffix and generic parameters for the symbol name
-      final displayString = type.getDisplayString(withNullability: false);
-      // Extract just the base type name (before < or ?)
-      final baseName = displayString.split('<').first.split('?').first.trim();
-      symbolName = baseName.isNotEmpty ? baseName : (displayString.isNotEmpty ? displayString : 'dynamic');
+      try {
+        final displayString = type.getDisplayString(withNullability: false);
+        // Extract just the base type name (before < or ?)
+        final baseName = displayString.split('<').first.split('?').first.trim();
+        symbolName = baseName.isNotEmpty ? baseName : (displayString.isNotEmpty ? displayString : 'dynamic');
+      } catch (e) {
+        // If getDisplayString fails (e.g., for InvalidType), use a safe fallback
+        symbolName = 'dynamic';
+      }
     }
 
     return cb.TypeReference((reference) {
