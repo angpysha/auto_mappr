@@ -135,18 +135,72 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
 
       // Check for InvalidType - this can happen with malformed generic types
       if (sourceType is InvalidType) {
+        // Try to get a display string for the invalid type
+        String sourceTypeDisplay;
+        try {
+          // ignore: deprecated_member_use, InvalidType may not support newer API
+          sourceTypeDisplay = sourceType.getDisplayString(withNullability: false);
+        } on Exception {
+          sourceTypeDisplay = '<invalid type>';
+        }
+        
+        // Try to get target type display for context
+        String targetTypeDisplay;
+        try {
+          // ignore: deprecated_member_use, targetType may be InvalidType too
+          targetTypeDisplay = targetType.getDisplayString(withNullability: false);
+        } on Exception {
+          targetTypeDisplay = '<unknown>';
+        }
+        
         throw InvalidGenerationSourceError(
-          'Source type is invalid and cannot be mapped from. This may be due to a malformed generic type parameter.',
+          'Source type "$sourceTypeDisplay" is invalid and cannot be mapped from in MapType<$sourceTypeDisplay, $targetTypeDisplay>. '
+          'This usually happens when:\n'
+          '  - A generic type parameter is not properly defined or is missing\n'
+          '  - A type argument is misspelled or refers to a non-existent type\n'
+          '  - There is a circular dependency or unresolved import\n'
+          '  - A generic type constraint is violated\n\n'
+          'Please check:\n'
+          '  1. That all generic type parameters (e.g., T, A, B) are properly declared\n'
+          '  2. That all type arguments match the expected generic constraints\n'
+          '  3. That all required imports are present\n'
+          '  4. That there are no typos in type names',
           element: element,
-          todo: 'Check your generic type parameters and ensure they are properly defined',
+          todo: 'Fix the invalid source type "$sourceTypeDisplay" in your MapType declaration',
         );
       }
       
       if (targetType is InvalidType) {
+        // Try to get a display string for the invalid type
+        String targetTypeDisplay;
+        try {
+          targetTypeDisplay = targetType.getDisplayString(withNullability: false);
+        } catch (e) {
+          targetTypeDisplay = '<invalid type>';
+        }
+        
+        // Try to get source type display for context
+        String sourceTypeDisplay;
+        try {
+          sourceTypeDisplay = sourceType.getDisplayString(withNullability: false);
+        } catch (e) {
+          sourceTypeDisplay = '<unknown>';
+        }
+        
         throw InvalidGenerationSourceError(
-          'Target type is invalid and cannot be mapped to. This may be due to a malformed generic type parameter.',
+          'Target type "$targetTypeDisplay" is invalid and cannot be mapped to in MapType<$sourceTypeDisplay, $targetTypeDisplay>. '
+          'This usually happens when:\n'
+          '  - A generic type parameter is not properly defined or is missing\n'
+          '  - A type argument is misspelled or refers to a non-existent type\n'
+          '  - There is a circular dependency or unresolved import\n'
+          '  - A generic type constraint is violated\n\n'
+          'Please check:\n'
+          '  1. That all generic type parameters (e.g., T, A, B) are properly declared\n'
+          '  2. That all type arguments match the expected generic constraints\n'
+          '  3. That all required imports are present\n'
+          '  4. That there are no typos in type names',
           element: element,
-          todo: 'Check your generic type parameters and ensure they are properly defined',
+          todo: 'Fix the invalid target type "$targetTypeDisplay" in your MapType declaration',
         );
       }
 
