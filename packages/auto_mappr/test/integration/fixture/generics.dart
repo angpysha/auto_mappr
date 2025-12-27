@@ -20,6 +20,8 @@ import 'generics.auto_mappr.dart';
   MapType<SetHolder<String>, SetHolder<String>>(),
   MapType<IterableHolder<String, int>, IterableHolder<String, int>>(),
   MapType<MapHolder<String, int, bool>, MapHolder<String, int, bool>>(),
+  // Edge cases for generic type parameters
+  MapType<AlphaDto<num?>, Alpha<num?>>(),
 ])
 class Mappr extends $Mappr {
   const Mappr();

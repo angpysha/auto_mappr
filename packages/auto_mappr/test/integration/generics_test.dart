@@ -172,4 +172,15 @@ void main() {
       );
     });
   });
+
+  group('edge cases for generic type parameters', () {
+    test('AlphaDto<num?> -> Alpha<num?>', () {
+      const dto = fixture.AlphaDto<num?>(fixture.With<num?, num?>(first: 42, second: 24), 100);
+      final converted = mappr.convert<fixture.AlphaDto<num?>, fixture.Alpha<num?>>(dto);
+
+      expect(converted.first.first, equals(42));
+      expect(converted.first.second, equals(24));
+      expect(converted.second, equals(100));
+    });
+  });
 }

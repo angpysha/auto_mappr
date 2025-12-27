@@ -61,9 +61,20 @@ class EmitterHelper {
         ? _resolveAssetImport(libraryPath)
         : _relative(libraryPath, fileWithAnnotation);
 
+    // Get symbol name - handle generic type parameters and other cases where element?.name might be null
+    String? symbolName = type.element?.name;
+    if (symbolName == null || symbolName.isEmpty) {
+      // Fallback to getDisplayString for generic parameters and other edge cases
+      // Remove nullability suffix and generic parameters for the symbol name
+      final displayString = type.getDisplayString(withNullability: false);
+      // Extract just the base type name (before < or ?)
+      final baseName = displayString.split('<').first.split('?').first.trim();
+      symbolName = baseName.isNotEmpty ? baseName : (displayString.isNotEmpty ? displayString : 'dynamic');
+    }
+
     return cb.TypeReference((reference) {
       reference
-        ..symbol = type.element?.name
+        ..symbol = symbolName
         ..url = importUrl
         ..isNullable = withNullabilitySuffix && type.isNullable;
 
