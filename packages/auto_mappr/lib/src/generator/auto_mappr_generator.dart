@@ -174,16 +174,18 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
         // Try to get a display string for the invalid type
         String targetTypeDisplay;
         try {
+          // ignore: deprecated_member_use, InvalidType may not support newer API
           targetTypeDisplay = targetType.getDisplayString(withNullability: false);
-        } catch (e) {
+        } on Exception {
           targetTypeDisplay = '<invalid type>';
         }
         
         // Try to get source type display for context
         String sourceTypeDisplay;
         try {
+          // ignore: deprecated_member_use, sourceType may be InvalidType too
           sourceTypeDisplay = sourceType.getDisplayString(withNullability: false);
-        } catch (e) {
+        } on Exception {
           sourceTypeDisplay = '<unknown>';
         }
         
