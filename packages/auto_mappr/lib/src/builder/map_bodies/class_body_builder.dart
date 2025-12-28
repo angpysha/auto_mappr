@@ -1,5 +1,6 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/dart/element/type_system.dart';
 import 'package:auto_mappr/src/builder/map_bodies/map_body_builder_base.dart';
 import 'package:auto_mappr/src/builder/value_assignment_builder.dart';
 import 'package:auto_mappr/src/extensions/dart_type_extension.dart';
@@ -17,6 +18,9 @@ class ClassBodyBuilder extends MapBodyBuilderBase {
     required super.mapping,
     required super.onUsedNullableMethodCallback,
   });
+
+  /// Get the type system for type substitution
+  TypeSystem get _typeSystem => mapping.target.element.library.typeSystem;
 
   @override
   Code build() {
@@ -149,6 +153,8 @@ class ClassBodyBuilder extends MapBodyBuilderBase {
           targetConstructorParam: constructorAssignment,
           fieldMapping: fieldMapping,
           typeConverters: mapping.typeConverters,
+          instantiatedTargetType: mapping.target,
+          typeSystem: _typeSystem,
         );
 
         mappedTargetConstructorParams.add(sourceAssignment);
@@ -166,6 +172,8 @@ class ClassBodyBuilder extends MapBodyBuilderBase {
             targetConstructorParam: constructorAssignment,
             fieldMapping: fieldMapping,
             typeConverters: mapping.typeConverters,
+            instantiatedTargetType: mapping.target,
+            typeSystem: _typeSystem,
           );
 
           mappedTargetConstructorParams.add(sourceAssignment);
@@ -193,6 +201,8 @@ class ClassBodyBuilder extends MapBodyBuilderBase {
           targetConstructorParam: constructorAssignment,
           fieldMapping: fieldMapping,
           typeConverters: mapping.typeConverters,
+          instantiatedTargetType: mapping.target,
+          typeSystem: _typeSystem,
         );
 
         mappedTargetConstructorParams.add(sourceAssignment);
@@ -217,6 +227,8 @@ class ClassBodyBuilder extends MapBodyBuilderBase {
             fieldMapping: fieldMapping,
             targetConstructorParam: constructorAssignment,
             typeConverters: mapping.typeConverters,
+            instantiatedTargetType: mapping.target,
+            typeSystem: _typeSystem,
           ),
         );
       }
@@ -332,6 +344,8 @@ class ClassBodyBuilder extends MapBodyBuilderBase {
                 sourceField: sourceField,
                 targetField: targetField,
                 typeConverters: mapping.typeConverters,
+                instantiatedTargetType: mapping.target,
+                typeSystem: _typeSystem,
               ),
               onUsedNullableMethodCallback: onUsedNullableMethodCallback,
             ).build(),

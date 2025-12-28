@@ -340,17 +340,18 @@ void main() {
 
     test('Full chain with different generic types', () {
       // Test that generic type T is properly propagated through the chain
-      const dtoInt = fixture.ADto<int>(
+      // Use num for deep chain as mappings are configured for num type (which includes int)
+      const dtoNum = fixture.ADto<num>(
         value: 1,
-        child: fixture.BDto<int>(
+        child: fixture.BDto<num>(
           value: 2,
-          child: fixture.CDto<int>(value: 3),
+          child: fixture.CDto<num>(value: 3),
         ),
       );
-      final convertedInt = mappr.convert<fixture.ADto<int>, fixture.A<int>>(dtoInt);
-      expect(convertedInt.value, isA<int>());
-      expect(convertedInt.child?.value, isA<int>());
-      expect(convertedInt.child?.child?.value, isA<int>());
+      final convertedNum = mappr.convert<fixture.ADto<num>, fixture.A<num>>(dtoNum);
+      expect(convertedNum.value, isA<num>());
+      expect(convertedNum.child?.value, isA<num>());
+      expect(convertedNum.child?.child?.value, isA<num>());
 
       const dtoString = fixture.ADto<String>(
         value: 'a',
