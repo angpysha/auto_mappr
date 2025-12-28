@@ -44,21 +44,34 @@ extension DartTypeExtension on DartType {
   bool isSame(DartType? other, {bool withNullability = false}) {
     if (other == null) return false;
 
+    // For nullable types, compare their non-nullable versions
+    // This ensures that BDto<int>? matches BDto<int> when withNullability is false
+    final thisType = this;
+    final otherType = other;
+    
+    // Get non-nullable versions for comparison if needed
+    final thisForComparison = (thisType is InterfaceType && thisType.isNullable && thisType.element?.library != null)
+        ? thisType.element!.library!.typeSystem.promoteToNonNull(thisType)
+        : thisType;
+    final otherForComparison = (otherType is InterfaceType && otherType.isNullable && otherType.element?.library != null)
+        ? otherType.element!.library!.typeSystem.promoteToNonNull(otherType)
+        : otherType;
+
     // Not the same type of type.
-    if ((this is InterfaceType) ^ (other is InterfaceType)) {
+    if ((thisForComparison is InterfaceType) ^ (otherForComparison is InterfaceType)) {
       return false;
     }
 
     // Name matches.
     // ignore: deprecated_member_use, for now use this - w/o this it fails
-    final thisName = getDisplayString(withNullability: withNullability);
+    final thisName = thisForComparison.getDisplayString(withNullability: withNullability);
     // ignore: deprecated_member_use, for now use this - w/o this it fails
-    final otherName = other.getDisplayString(withNullability: withNullability);
+    final otherName = otherForComparison.getDisplayString(withNullability: withNullability);
     final isSameName = thisName == otherName;
 
     // Library matches.
-    final thisLibrary = element?.library?.uri.toString();
-    final otherLibrary = other.element?.library?.uri.toString();
+    final thisLibrary = thisForComparison.element?.library?.uri.toString();
+    final otherLibrary = otherForComparison.element?.library?.uri.toString();
     final isSameLibrary = thisLibrary == otherLibrary;
 
     final isSameExceptNullability = isSameName && isSameLibrary;
@@ -68,8 +81,8 @@ extension DartTypeExtension on DartType {
     }
 
     // Nullability matches.
-    final thisNullability = isNullable;
-    final otherNullability = other.isNullable;
+    final thisNullability = thisType.isNullable;
+    final otherNullability = otherType.isNullable;
     final isSameNullability = thisNullability == otherNullability;
 
     return isSameExceptNullability && isSameNullability;

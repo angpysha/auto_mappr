@@ -50,6 +50,7 @@ abstract class MethodBuilderBase {
     // For nullable methods, use non-nullable versions of types for the method name
     // to ensure consistency (the _Nullable suffix already indicates the method handles nullable types)
     // We use toConvertMethodName with includeTopLevelNullability: false to avoid adding 'Q' for top-level nullability
+    // BUT we still need to preserve nullability for type arguments (e.g., B<String?> should become B$StringQQ)
     final sourceName = source.toConvertMethodName(includeTopLevelNullability: false);
     final targetName = target.toConvertMethodName(includeTopLevelNullability: false);
     

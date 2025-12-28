@@ -35,9 +35,44 @@ class AutoMapprConfig {
     required DartType? source,
     required DartType? target,
   }) {
-    return mappers.firstWhereOrNull(
-      (mapper) => mapper.source.isSame(source) && mapper.target.isSame(target),
+    if (source == null || target == null) return null;
+    
+    // First, try to find exact mapping (including nullability)
+    var mapping = mappers.firstWhereOrNull(
+      (mapper) => mapper.source.isSame(source, withNullability: true) && 
+                  mapper.target.isSame(target, withNullability: true),
     );
+    
+    if (mapping != null) return mapping;
+    
+    // If not found, try to find mapping ignoring nullability
+    // This handles cases where we have BDto<int>? -> B<int>? but mapping is BDto<int> -> B<int>
+    mapping = mappers.firstWhereOrNull(
+      (mapper) => mapper.source.isSame(source, withNullability: false) && 
+                  mapper.target.isSame(target, withNullability: false),
+    );
+    
+    if (mapping != null) return mapping;
+    
+    // If still not found and types are nullable, try to find mapping for non-nullable versions
+    // This handles cases where field is nullable but mapping is defined for non-nullable types
+    if (source.isNullable || target.isNullable) {
+      final nonNullSource = source.isNullable && source.element?.library != null
+          ? source.element!.library!.typeSystem.promoteToNonNull(source)
+          : source;
+      final nonNullTarget = target.isNullable && target.element?.library != null
+          ? target.element!.library!.typeSystem.promoteToNonNull(target)
+          : target;
+      
+      if (nonNullSource != source || nonNullTarget != target) {
+        mapping = mappers.firstWhereOrNull(
+          (mapper) => mapper.source.isSame(nonNullSource, withNullability: false) && 
+                      mapper.target.isSame(nonNullTarget, withNullability: false),
+        );
+      }
+    }
+    
+    return mapping;
   }
 
   Iterable<String> getAvailableMappingsDocComment() {

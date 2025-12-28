@@ -44,7 +44,62 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
       return expressionToUse;
     }
 
-    final nestedMapping = mapperConfig.findMapping(source: source, target: target);
+    var nestedMapping = mapperConfig.findMapping(source: source, target: target);
+    var resolvedTarget = target;
+
+    // If mapping not found and target has generic parameters, try to resolve them from source
+    // This handles cases like CDto<num>? -> C<T>? where T is a generic parameter from parent type
+    // We try to find mapping by matching base types and using source type arguments
+    if (nestedMapping == null && target is ParameterizedType && source is ParameterizedType) {
+      final targetParam = target;
+      final sourceParam = source;
+
+      // Check if target has generic parameters (TypeParameterType) and source has concrete types
+      final targetHasGenericParams = targetParam.typeArguments.any((arg) => arg is TypeParameterType);
+      final sourceHasConcreteTypes = sourceParam.typeArguments.every((arg) => !(arg is TypeParameterType));
+
+      if (targetHasGenericParams &&
+          sourceHasConcreteTypes &&
+          targetParam.typeArguments.length == sourceParam.typeArguments.length &&
+          targetParam.element != null &&
+          sourceParam.element != null) {
+        // Try to find mapping by iterating through all mappers and checking if
+        // source matches and target base type matches with resolved type arguments
+        for (final mapper in mapperConfig.mappers) {
+          // Check if mapper source matches our source (ignoring nullability)
+          if (mapper.source.isSame(source, withNullability: false)) {
+            // Check if mapper target has the same base type as our target
+            if (mapper.target is ParameterizedType) {
+              final mapperTarget = mapper.target;
+              if (mapperTarget.element == targetParam.element &&
+                  mapperTarget.typeArguments.length == sourceParam.typeArguments.length) {
+                // Check if mapper target type arguments match source type arguments
+                bool typeArgsMatch = true;
+                for (int i = 0; i < mapperTarget.typeArguments.length; i++) {
+                  if (!mapperTarget.typeArguments[i].isSame(sourceParam.typeArguments[i], withNullability: false)) {
+                    typeArgsMatch = false;
+                    break;
+                  }
+                }
+                if (typeArgsMatch) {
+                  nestedMapping = mapper;
+                  // Use mapper's target type (which has concrete type arguments) but preserve original nullability
+                  // If original target is nullable, we need to make resolved target nullable too
+                  if (target.isNullable && !mapper.target.isNullable) {
+                    // For now, we'll use mapper.target and let mappingCall handle nullability
+                    // The method name will be generated from mapper.target, but the call will use original target's nullability
+                    resolvedTarget = mapper.target;
+                  } else {
+                    resolvedTarget = mapper.target;
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
 
     // Type converters.
     final typeConvertersBuilder = TypeConverterBuilder(
@@ -69,25 +124,27 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
       // If target is a generic type parameter (TypeParameterType), we can use the source directly
       // The generic parameter will be resolved at runtime when the actual type is known
       final isTargetGenericParameter = target is TypeParameterType;
-      
+
       // Also check if target is a ParameterizedType where all type arguments are TypeParameterType
       // For example, With<T, T> where T is a generic parameter
-      final isTargetGenericParameterizedType = target is ParameterizedType &&
+      final isTargetGenericParameterizedType =
+          target is ParameterizedType &&
           target.typeArguments.isNotEmpty &&
           target.typeArguments.every((arg) => arg is TypeParameterType);
-      
+
       // Check if source and target have the same base type (same class name)
       // This handles cases like With<num, num> -> With<T, T>
       // But we can only use source directly if there are no nested type differences
       bool hasSameBaseType = false;
       bool canUseSourceDirectly = false;
-      
+
       if (source is InterfaceType && target is InterfaceType) {
         final sourceInterface = source;
         final targetInterface = target;
-        hasSameBaseType = sourceInterface.element.name == targetInterface.element.name &&
+        hasSameBaseType =
+            sourceInterface.element.name == targetInterface.element.name &&
             sourceInterface.element.library.uri == targetInterface.element.library.uri;
-        
+
         // Only use source directly if:
         // 1. Target has all generic parameters (TypeParameterType) - simple case like With<T, T>
         // 2. OR source and target are exactly the same (including type arguments)
@@ -102,7 +159,7 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
             final sourceArgs = (source is ParameterizedType) ? source.typeArguments : <DartType>[];
             // ignore: unnecessary_type_check, linter incorrectly thinks this is always true
             final targetArgs = (target is ParameterizedType) ? target.typeArguments : <DartType>[];
-            
+
             if (sourceArgs.isNotEmpty || targetArgs.isNotEmpty) {
               if (sourceArgs.length == targetArgs.length) {
                 // Check if all type arguments match exactly (including nullability)
@@ -110,7 +167,7 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
                 for (int i = 0; i < sourceArgs.length; i++) {
                   final sourceArg = sourceArgs[i];
                   final targetArg = targetArgs[i];
-                  
+
                   // If target arg is a generic parameter, we need to be careful
                   // If source arg is nullable and target generic param might be non-nullable,
                   // we can't use source directly as it will cause type errors
@@ -135,7 +192,7 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
                     // Otherwise, generic parameter can accept the source type
                     continue;
                   }
-                  
+
                   // For concrete types, they must match exactly (including nullability)
                   // This prevents issues like Wrapper<Inner<Data?>> -> Wrapper<Inner<Data>>
                   if (!sourceArg.isSame(targetArg, withNullability: true)) {
@@ -151,14 +208,14 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
           }
         }
       }
-      
+
       if (isTargetGenericParameter || (isTargetGenericParameterizedType && canUseSourceDirectly)) {
         // For generic parameters or parameterized types with generic parameters,
         // we can use the source value directly
         // However, if convertMethodArgument is provided (e.g., from iterable mapping),
         // we should use that instead of sourceOnModel
         final expressionToUse = convertMethodArgument ?? sourceOnModel;
-        
+
         // Handle nullability appropriately
         final shouldIgnoreNull =
             fieldMapping?.ignoreNull ??
@@ -174,7 +231,7 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
         // Otherwise, use source directly (generic parameter will accept it)
         return expressionToUse;
       }
-      
+
       if (target.isNullable) {
         log.warning(
           "Can't find nested mapping '$assignment' but target is nullable. Setting null. ($enclosingMappingMessage).",
@@ -188,10 +245,25 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
       );
     }
 
+    // If we found a mapping with resolved target, use it for method name generation
+    // ONLY for non-nullable methods, because nullable methods have complex nullability handling
+    // that doesn't work well with resolved targets
+    DartType? targetForMethodName;
+    if (resolvedTarget != target &&
+        resolvedTarget is ParameterizedType &&
+        target is ParameterizedType &&
+        !target.isNullable) {
+      // Only use resolvedTarget for non-nullable targets
+      targetForMethodName = resolvedTarget;
+    } else {
+      targetForMethodName = null;
+    }
+
     final convertCallExpression = mappingCall(
       nestedMapping: nestedMapping,
       source: source,
       target: target,
+      resolvedTargetForMethodName: targetForMethodName,
       convertMethodArgument: convertMethodArgument,
       includeGenericTypes: includeGenericTypes,
     );
@@ -226,7 +298,13 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
     required TypeMapping nestedMapping,
     Expression? convertMethodArgument,
     bool includeGenericTypes = false,
+    DartType? resolvedTargetForMethodName,
   }) {
+    // Use resolvedTargetForMethodName for method name generation if provided
+    // Even if nullability doesn't match, we should use it for type arguments
+    // The nullability for top-level is handled separately via useNullableMethod
+    // This handles cases where target is B<T>? but resolvedTarget is B<String?>
+    final targetForMethodName = resolvedTargetForMethodName ?? target;
     final isTargetNullable = target.isNullable;
 
     final useNullableMethod = isTargetNullable && !mapping.hasWhenNullDefault();
@@ -237,8 +315,8 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
     // Otherwise use non-nullable.
     final convertMethod = refer(
       useNullableMethod
-          ? MethodBuilderBase.constructNullableConvertMethodName(source: source, target: target)
-          : MethodBuilderBase.constructConvertMethodName(source: source, target: target),
+          ? MethodBuilderBase.constructNullableConvertMethodName(source: source, target: targetForMethodName)
+          : MethodBuilderBase.constructConvertMethodName(source: source, target: targetForMethodName),
     );
 
     if (useNullableMethod) {
