@@ -62,19 +62,43 @@ extension DartTypeExtension on DartType {
       return false;
     }
 
-    // Name matches.
-    // ignore: deprecated_member_use, for now use this - w/o this it fails
-    final thisName = thisForComparison.getDisplayString(withNullability: withNullability);
-    // ignore: deprecated_member_use, for now use this - w/o this it fails
-    final otherName = otherForComparison.getDisplayString(withNullability: withNullability);
-    final isSameName = thisName == otherName;
+    // Check element name and library first
+    final thisElementName = thisForComparison.element?.name;
+    final otherElementName = otherForComparison.element?.name;
+    if (thisElementName != otherElementName) {
+      return false;
+    }
 
     // Library matches.
     final thisLibrary = thisForComparison.element?.library?.uri.toString();
     final otherLibrary = otherForComparison.element?.library?.uri.toString();
-    final isSameLibrary = thisLibrary == otherLibrary;
+    if (thisLibrary != otherLibrary) {
+      return false;
+    }
 
-    final isSameExceptNullability = isSameName && isSameLibrary;
+    // Check type arguments (including their nullability)
+    // This is important: we ALWAYS check type arguments' nullability, even when withNullability: false
+    // withNullability: false only means "ignore top-level nullability", not "ignore type arguments' nullability"
+    if (thisForComparison is ParameterizedType && otherForComparison is ParameterizedType) {
+      final thisParams = thisForComparison as ParameterizedType;
+      final otherParams = otherForComparison as ParameterizedType;
+      
+      if (thisParams.typeArguments.length != otherParams.typeArguments.length) {
+        return false;
+      }
+      
+      for (int i = 0; i < thisParams.typeArguments.length; i++) {
+        final thisArg = thisParams.typeArguments[i];
+        final otherArg = otherParams.typeArguments[i];
+        // Recursively compare type arguments with nullability
+        // This ensures BDto<String?> does NOT match BDto<String>
+        if (!thisArg.isSame(otherArg, withNullability: true)) {
+          return false;
+        }
+      }
+    }
+
+    final isSameExceptNullability = true;
 
     if (!withNullability) {
       return isSameExceptNullability;

@@ -124,7 +124,7 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
           todo: 'Provide a valid source type',
         );
       }
-      
+
       if (targetType == null) {
         throw InvalidGenerationSourceError(
           'Target type is null and cannot be mapped to',
@@ -143,7 +143,7 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
         } on Exception {
           sourceTypeDisplay = '<invalid type>';
         }
-        
+
         // Try to get target type display for context
         String targetTypeDisplay;
         try {
@@ -152,7 +152,7 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
         } on Exception {
           targetTypeDisplay = '<unknown>';
         }
-        
+
         throw InvalidGenerationSourceError(
           'Source type "$sourceTypeDisplay" is invalid and cannot be mapped from in MapType<$sourceTypeDisplay, $targetTypeDisplay>. '
           'This usually happens when:\n'
@@ -169,7 +169,7 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
           todo: 'Fix the invalid source type "$sourceTypeDisplay" in your MapType declaration',
         );
       }
-      
+
       if (targetType is InvalidType) {
         // Try to get a display string for the invalid type
         String targetTypeDisplay;
@@ -179,7 +179,7 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
         } on Exception {
           targetTypeDisplay = '<invalid type>';
         }
-        
+
         // Try to get source type display for context
         String sourceTypeDisplay;
         try {
@@ -188,7 +188,7 @@ class AutoMapprGenerator extends GeneratorForAnnotation<annotation.AutoMappr> {
         } on Exception {
           sourceTypeDisplay = '<unknown>';
         }
-        
+
         throw InvalidGenerationSourceError(
           'Target type "$targetTypeDisplay" is invalid and cannot be mapped to in MapType<$sourceTypeDisplay, $targetTypeDisplay>. '
           'This usually happens when:\n'
