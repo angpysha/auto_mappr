@@ -337,6 +337,9 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
               mapperTarget.typeArguments.length == sourceParam.typeArguments.length) {
             // Check if mapper target type arguments match source type arguments
             // This needs to be recursive for nested generic types
+            // IMPORTANT: We also check if there's a mapping between source arg and mapper arg
+            // For example: DurableFunctionSyncResult<CategoryDto> -> RangeSyncResult<CategoryProjection>
+            // where CategoryDto -> CategoryProjection mapping exists
             bool typeArgsMatch = true;
             for (int i = 0; i < mapperTarget.typeArguments.length; i++) {
               final mapperArg = mapperTarget.typeArguments[i];
@@ -367,8 +370,15 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
                   break;
                 }
               } else if (!mapperArg.isSame(sourceArg, withNullability: false)) {
-                typeArgsMatch = false;
-                break;
+                // Type arguments don't match directly
+                // Check if there's a mapping from sourceArg to mapperArg
+                // For example: CategoryDto -> CategoryProjection
+                final argMapping = mapperConfig.findMapping(source: sourceArg, target: mapperArg);
+                if (argMapping == null) {
+                  typeArgsMatch = false;
+                  break;
+                }
+                // If mapping exists, we can proceed - the type arguments are compatible
               }
             }
 
