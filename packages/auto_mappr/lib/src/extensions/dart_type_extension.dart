@@ -130,9 +130,23 @@ extension DartTypeExtension on DartType {
         if (i > 0) buffer.write('_');
         final arg = type.typeArguments[i];
         // Recursively append type argument name (always include nullability for type arguments)
-        _appendTypeNameForMethod(arg, buffer, includeTopLevelNullability: true);
+        // This ensures that nullable type arguments are properly encoded
+        // Use a temporary buffer to check if 'Q' was added by _appendTypeNameForMethod
+        final tempBuffer = StringBuffer();
+        _appendTypeNameForMethod(arg, tempBuffer, includeTopLevelNullability: true);
+        final argName = tempBuffer.toString();
+        buffer.write(argName);
+        
         // Add nullability marker for nullable type arguments
-        if (arg.isNullable) {
+        // This is crucial: even if _appendTypeNameForMethod already added a 'Q' for top-level nullability,
+        // we need to add another 'Q' to encode that the type argument itself is nullable
+        // This handles cases like B<String?> where String? is a nullable type argument
+        // We check if the arg name ends with 'Q' (from _appendTypeNameForMethod) or if arg is nullable
+        // If it ends with 'Q', we add another 'Q' to encode the type argument's nullability
+        final isArgNullable = arg.isNullable || 
+            arg.nullabilitySuffix == NullabilitySuffix.question ||
+            argName.endsWith('Q');
+        if (isArgNullable) {
           buffer.write('Q'); // Q for Question mark (nullable)
         }
       }

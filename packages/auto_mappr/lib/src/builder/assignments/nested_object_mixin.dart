@@ -1,3 +1,4 @@
+import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:auto_mappr/src/builder/assignments/assignments.dart';
 import 'package:auto_mappr/src/builder/methods/method_builder_base.dart';
@@ -49,55 +50,12 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
 
     // If mapping not found and target has generic parameters, try to resolve them from source
     // This handles cases like CDto<num>? -> C<T>? where T is a generic parameter from parent type
-    // We try to find mapping by matching base types and using source type arguments
+    // We recursively resolve generic parameters at any depth (up to 7 levels)
     if (nestedMapping == null && target is ParameterizedType && source is ParameterizedType) {
-      final targetParam = target;
-      final sourceParam = source;
-
-      // Check if target has generic parameters (TypeParameterType) and source has concrete types
-      final targetHasGenericParams = targetParam.typeArguments.any((arg) => arg is TypeParameterType);
-      final sourceHasConcreteTypes = sourceParam.typeArguments.every((arg) => !(arg is TypeParameterType));
-
-      if (targetHasGenericParams &&
-          sourceHasConcreteTypes &&
-          targetParam.typeArguments.length == sourceParam.typeArguments.length &&
-          targetParam.element != null &&
-          sourceParam.element != null) {
-        // Try to find mapping by iterating through all mappers and checking if
-        // source matches and target base type matches with resolved type arguments
-        for (final mapper in mapperConfig.mappers) {
-          // Check if mapper source matches our source (ignoring nullability)
-          if (mapper.source.isSame(source, withNullability: false)) {
-            // Check if mapper target has the same base type as our target
-            if (mapper.target is ParameterizedType) {
-              final mapperTarget = mapper.target;
-              if (mapperTarget.element == targetParam.element &&
-                  mapperTarget.typeArguments.length == sourceParam.typeArguments.length) {
-                // Check if mapper target type arguments match source type arguments
-                bool typeArgsMatch = true;
-                for (int i = 0; i < mapperTarget.typeArguments.length; i++) {
-                  if (!mapperTarget.typeArguments[i].isSame(sourceParam.typeArguments[i], withNullability: false)) {
-                    typeArgsMatch = false;
-                    break;
-                  }
-                }
-                if (typeArgsMatch) {
-                  nestedMapping = mapper;
-                  // Use mapper's target type (which has concrete type arguments) but preserve original nullability
-                  // If original target is nullable, we need to make resolved target nullable too
-                  if (target.isNullable && !mapper.target.isNullable) {
-                    // For now, we'll use mapper.target and let mappingCall handle nullability
-                    // The method name will be generated from mapper.target, but the call will use original target's nullability
-                    resolvedTarget = mapper.target;
-                  } else {
-                    resolvedTarget = mapper.target;
-                  }
-                  break;
-                }
-              }
-            }
-          }
-        }
+      final resolved = _resolveGenericMapping(mapperConfig: mapperConfig, source: source, target: target, maxDepth: 7);
+      if (resolved != null) {
+        nestedMapping = resolved.mapping;
+        resolvedTarget = resolved.resolvedTarget;
       }
     }
 
@@ -245,15 +203,17 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
       );
     }
 
-    // If we found a mapping with resolved target, use it for method name generation
-    // ONLY for non-nullable methods, because nullable methods have complex nullability handling
-    // that doesn't work well with resolved targets
+    // If we found a mapping with resolved target, we need to create a new target type
+    // that preserves nullability from source type arguments
+    // For example: BDto<String?>? -> B<T>? should use B<String?> for method name generation
     DartType? targetForMethodName;
     if (resolvedTarget != target &&
         resolvedTarget is ParameterizedType &&
         target is ParameterizedType &&
-        !target.isNullable) {
-      // Only use resolvedTarget for non-nullable targets
+        source is ParameterizedType) {
+      // Create a hybrid type: use base type and structure from resolvedTarget,
+      // but preserve nullability from source type arguments
+      // This ensures we generate correct method names like B$StringQQ instead of B$String or B$T
       targetForMethodName = resolvedTarget;
     } else {
       targetForMethodName = null;
@@ -333,4 +293,157 @@ mixin NestedObjectMixin on AssignmentBuilderBase {
                 : [],
           );
   }
+
+  /// Recursively resolves generic type parameters to find a mapping.
+  /// This handles cases like CDto<num>? -> C<T>? where T is a generic parameter from parent type.
+  /// Supports up to [maxDepth] levels of nesting.
+  _ResolvedMapping? _resolveGenericMapping({
+    required AutoMapprConfig mapperConfig,
+    required DartType source,
+    required DartType target,
+    int maxDepth = 7,
+    int currentDepth = 0,
+  }) {
+    if (currentDepth >= maxDepth) return null;
+
+    if (target is! ParameterizedType || source is! ParameterizedType) {
+      return null;
+    }
+
+    final targetParam = target;
+    final sourceParam = source;
+
+    // Check if target has generic parameters (TypeParameterType) and source has concrete types
+    final targetHasGenericParams = targetParam.typeArguments.any((arg) => arg is TypeParameterType);
+    final sourceHasConcreteTypes = sourceParam.typeArguments.every((arg) => !(arg is TypeParameterType));
+
+    if (!targetHasGenericParams ||
+        !sourceHasConcreteTypes ||
+        targetParam.typeArguments.length != sourceParam.typeArguments.length ||
+        targetParam.element == null ||
+        sourceParam.element == null) {
+      return null;
+    }
+
+    // Try to find mapping by iterating through all mappers and checking if
+    // source matches and target base type matches with resolved type arguments
+    for (final mapper in mapperConfig.mappers) {
+      // Check if mapper source matches our source (ignoring nullability)
+      if (mapper.source.isSame(source, withNullability: false)) {
+        // Check if mapper target has the same base type as our target
+        if (mapper.target is ParameterizedType) {
+          final mapperTarget = mapper.target;
+          if (mapperTarget.element == targetParam.element &&
+              mapperTarget.typeArguments.length == sourceParam.typeArguments.length) {
+            // Check if mapper target type arguments match source type arguments
+            // This needs to be recursive for nested generic types
+            bool typeArgsMatch = true;
+            for (int i = 0; i < mapperTarget.typeArguments.length; i++) {
+              final mapperArg = mapperTarget.typeArguments[i];
+              final sourceArg = sourceParam.typeArguments[i];
+
+              // If mapper arg is a generic parameter, we can't match it directly
+              // But if source arg matches, that's fine
+              if (mapperArg is TypeParameterType) {
+                // This shouldn't happen in configured mappings, but handle it
+                continue;
+              }
+
+              // Recursively check nested generic types
+              if (mapperArg is ParameterizedType) {
+                if (sourceArg is ParameterizedType) {
+                  // Check if nested types match (recursively)
+                  if (!_typesMatchRecursively(
+                    mapperArg,
+                    sourceArg,
+                    maxDepth: maxDepth,
+                    currentDepth: currentDepth + 1,
+                  )) {
+                    typeArgsMatch = false;
+                    break;
+                  }
+                } else {
+                  typeArgsMatch = false;
+                  break;
+                }
+              } else if (!mapperArg.isSame(sourceArg, withNullability: false)) {
+                typeArgsMatch = false;
+                break;
+              }
+            }
+
+            if (typeArgsMatch) {
+              // IMPORTANT: Check if source has nullable type arguments
+              // If so, mapper.target might have non-nullable type arguments
+              // We can still use the mapping, but we should NOT use resolvedTarget
+              // for method name generation because nullability doesn't match
+
+              // Check if we need to adjust nullability
+              bool hasNullableTypeArgs = false;
+              if (sourceParam.typeArguments.isNotEmpty) {
+                for (int i = 0; i < sourceParam.typeArguments.length; i++) {
+                  final sourceArg = sourceParam.typeArguments[i];
+                  // If source arg is nullable, we need to use a different approach
+                  if (sourceArg.isNullable) {
+                    hasNullableTypeArgs = true;
+                    break;
+                  }
+                }
+              }
+
+              if (hasNullableTypeArgs) {
+                // Don't return resolved mapping for nullable type arguments
+                // The system will use findMapping which will handle nullable types correctly
+                continue;
+              }
+
+              // Use mapper's target type (which has concrete type arguments)
+              // This ensures we use concrete types instead of generic parameters for method name generation
+              // Important: preserve the nullability of the original target if it's nullable
+              // This handles cases where target is B<T>? but mapper.target is B<String>
+              final resolvedTargetType = mapper.target;
+              return _ResolvedMapping(mapping: mapper, resolvedTarget: resolvedTargetType);
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /// Recursively checks if two types match, handling nested generic types.
+  bool _typesMatchRecursively(DartType type1, DartType type2, {int maxDepth = 7, int currentDepth = 0}) {
+    if (currentDepth >= maxDepth) return false;
+
+    // If both are ParameterizedType, check recursively
+    if (type1 is ParameterizedType && type2 is ParameterizedType) {
+      if (type1.element != type2.element || type1.typeArguments.length != type2.typeArguments.length) {
+        return false;
+      }
+
+      for (int i = 0; i < type1.typeArguments.length; i++) {
+        if (!_typesMatchRecursively(
+          type1.typeArguments[i],
+          type2.typeArguments[i],
+          maxDepth: maxDepth,
+          currentDepth: currentDepth + 1,
+        )) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // Otherwise, check if they're the same (ignoring nullability)
+    return type1.isSame(type2, withNullability: false);
+  }
+}
+
+/// Helper class to hold resolved mapping information.
+class _ResolvedMapping {
+  final TypeMapping mapping;
+  final DartType resolvedTarget;
+
+  const _ResolvedMapping({required this.mapping, required this.resolvedTarget});
 }

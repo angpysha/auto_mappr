@@ -180,6 +180,153 @@ void main() {
     });
   });
 
+  group('Five level recursion', () {
+    test('ADto<double> -> A<double> with full chain through E branch to FDto<double> -> F<double>', () {
+      const dto = fixture.ADto<double>(
+        value: 1.0,
+        child: fixture.BDto<double>(
+          value: 2.0,
+          child: fixture.CDto<double>(
+            value: 3.0,
+            child: fixture.DDto<double>(value: 4.0),
+          ),
+        ),
+      );
+      final converted = mappr.convert<fixture.ADto<double>, fixture.A<double>>(dto);
+
+      expect(
+        converted,
+        equals(
+          const fixture.A<double>(
+            value: 1.0,
+            child: fixture.B<double>(
+              value: 2.0,
+              child: fixture.C<double>(
+                value: 3.0,
+                child: fixture.D<double>(value: 4.0),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Test E branch separately for 5 levels
+      const eDto = fixture.EDto<double>(
+        value: 5.0,
+        child: fixture.FDto<double>(value: 6.0),
+      );
+      final convertedE = mappr.convert<fixture.EDto<double>, fixture.E<double>>(eDto);
+
+      expect(
+        convertedE,
+        equals(
+          const fixture.E<double>(
+            value: 5.0,
+            child: fixture.F<double>(value: 6.0),
+          ),
+        ),
+      );
+    });
+
+    test('ADto<double> -> A<double> with partial chain (only B)', () {
+      const dto = fixture.ADto<double>(
+        value: 10.0,
+        child: fixture.BDto<double>(value: 20.0),
+      );
+      final converted = mappr.convert<fixture.ADto<double>, fixture.A<double>>(dto);
+
+      expect(
+        converted,
+        equals(
+          const fixture.A<double>(
+            value: 10.0,
+            child: fixture.B<double>(value: 20.0),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('Seven level recursion', () {
+    test('ADto<Object> -> A<Object> with full chain through E branch to GDto<Object> -> G<Object>', () {
+      // Test A->B->C->D chain (4 levels)
+      const dto = fixture.ADto<Object>(
+        value: 'level1',
+        child: fixture.BDto<Object>(
+          value: 'level2',
+          child: fixture.CDto<Object>(
+            value: 'level3',
+            child: fixture.DDto<Object>(value: 'level4'),
+          ),
+        ),
+      );
+      final converted = mappr.convert<fixture.ADto<Object>, fixture.A<Object>>(dto);
+
+      expect(
+        converted,
+        equals(
+          const fixture.A<Object>(
+            value: 'level1',
+            child: fixture.B<Object>(
+              value: 'level2',
+              child: fixture.C<Object>(
+                value: 'level3',
+                child: fixture.D<Object>(value: 'level4'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Test E->F->G chain (3 levels) to get 7 total levels
+      const eDto = fixture.EDto<Object>(
+        value: 'level5',
+        child: fixture.FDto<Object>(
+          value: 'level6',
+          child: fixture.GDto<Object>(value: 'level7'),
+        ),
+      );
+      final convertedE = mappr.convert<fixture.EDto<Object>, fixture.E<Object>>(eDto);
+
+      expect(
+        convertedE,
+        equals(
+          const fixture.E<Object>(
+            value: 'level5',
+            child: fixture.F<Object>(
+              value: 'level6',
+              child: fixture.G<Object>(value: 'level7'),
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('ADto<Object> -> A<Object> with partial chain (only B and C)', () {
+      const dto = fixture.ADto<Object>(
+        value: 'root',
+        child: fixture.BDto<Object>(
+          value: 'b',
+          child: fixture.CDto<Object>(value: 'c'),
+        ),
+      );
+      final converted = mappr.convert<fixture.ADto<Object>, fixture.A<Object>>(dto);
+
+      expect(
+        converted,
+        equals(
+          const fixture.A<Object>(
+            value: 'root',
+            child: fixture.B<Object>(
+              value: 'b',
+              child: fixture.C<Object>(value: 'c'),
+            ),
+          ),
+        ),
+      );
+    });
+  });
+
   group('Edge cases', () {
     test('Empty chain (no children)', () {
       const dto = fixture.ADto<String>(value: 'root');

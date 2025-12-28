@@ -28,6 +28,23 @@ import 'recursive_mappers.auto_mappr.dart';
   MapType<ADto<String?>, A<String?>>(),
   MapType<BDto<String?>, B<String?>>(),
   MapType<CDto<String?>, C<String?>>(),
+  
+  // 5 level recursion
+  MapType<ADto<double>, A<double>>(),
+  MapType<BDto<double>, B<double>>(),
+  MapType<CDto<double>, C<double>>(),
+  MapType<DDto<double>, D<double>>(),
+  MapType<EDto<double>, E<double>>(),
+  MapType<FDto<double>, F<double>>(),
+  
+  // 7 level recursion
+  MapType<ADto<Object>, A<Object>>(),
+  MapType<BDto<Object>, B<Object>>(),
+  MapType<CDto<Object>, C<Object>>(),
+  MapType<DDto<Object>, D<Object>>(),
+  MapType<EDto<Object>, E<Object>>(),
+  MapType<FDto<Object>, F<Object>>(),
+  MapType<GDto<Object>, G<Object>>(),
 ])
 class Mappr extends $Mappr {
   const Mappr();
@@ -106,16 +123,52 @@ class D<T> extends Equatable {
 // Alternative branch: EDto<T> -> E<T>
 class EDto<T> {
   final T value;
+  final FDto<T>? child;
 
-  const EDto({required this.value});
+  const EDto({required this.value, this.child});
 }
 
 class E<T> extends Equatable {
+  final T value;
+  final F<T>? child;
+
+  @override
+  List<Object?> get props => [value, child];
+
+  const E({required this.value, this.child});
+}
+
+// Level 5: FDto<T> -> F<T>
+class FDto<T> {
+  final T value;
+  final GDto<T>? child;
+
+  const FDto({required this.value, this.child});
+}
+
+class F<T> extends Equatable {
+  final T value;
+  final G<T>? child;
+
+  @override
+  List<Object?> get props => [value, child];
+
+  const F({required this.value, this.child});
+}
+
+// Level 6: GDto<T> -> G<T>
+class GDto<T> {
+  final T value;
+
+  const GDto({required this.value});
+}
+
+class G<T> extends Equatable {
   final T value;
 
   @override
   List<Object?> get props => [value];
 
-  const E({required this.value});
+  const G({required this.value});
 }
 
