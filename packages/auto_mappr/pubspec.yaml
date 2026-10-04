@@ -10,7 +10,11 @@ environment:
 
 dependencies:
   analyzer: '>=14.0.0 <15.0.0' # Same as freezed
-  auto_mappr_annotation: ^2.5.0
+  auto_mappr_annotation:
+    git:
+      url: https://github.com/angpysha/auto_mappr.git
+      ref: fc4912e56bb1db44e4413cac056711b934e78819
+      path: packages/auto_mappr_annotation
   build: ^4.0.11
   built_collection: ^5.1.1
   code_builder: ^4.10.1
